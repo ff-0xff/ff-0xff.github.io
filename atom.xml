@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-03-09T11:14:55.674Z</updated>
+  <updated>2020-03-09T16:00:00.000Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -17,11 +17,38 @@
   <generator uri="https://hexo.io/">Hexo</generator>
   
   <entry>
+    <title>博客跳坑二三事</title>
+    <link href="http://yoursite.com/2020/03/10/%E5%8D%9A%E5%AE%A2%E8%B7%B3%E5%9D%91%E4%BA%8C%E4%B8%89%E4%BA%8B/"/>
+    <id>http://yoursite.com/2020/03/10/%E5%8D%9A%E5%AE%A2%E8%B7%B3%E5%9D%91%E4%BA%8C%E4%B8%89%E4%BA%8B/</id>
+    <published>2020-03-09T16:00:00.000Z</published>
+    <updated>2020-03-09T16:00:00.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>已经有很多详细步骤的文章了，所以只记录我安装的插件和一些坑点。</p><a id="more"></a><h1 id="安装阶段"><a href="#安装阶段" class="headerlink" title="安装阶段"></a>安装阶段</h1><h2 id="省略安装步骤"><a href="#省略安装步骤" class="headerlink" title="省略安装步骤"></a>省略安装步骤</h2><p><a href="https://www.baidu.com/s?ie=UTF-8&wd=hexo%20github%20pages" target="_blank" rel="noopener">百度搜索 hexo github pages</a> 皮一下很开心</p><p>如果有疑问可以看看 <a href="https://hexo.io/zh-cn/docs/" target="_blank" rel="noopener">hexo 文档</a></p><h2 id="同步到GitHub-Pages"><a href="#同步到GitHub-Pages" class="headerlink" title="同步到GitHub Pages"></a>同步到GitHub Pages</h2><p>我用了这个插件 <a href="https://github.com/hexojs/hexo-deployer-git" target="_blank" rel="noopener">hexo-deployer-git</a></p><h2 id="美化主题"><a href="#美化主题" class="headerlink" title="美化主题"></a>美化主题</h2><p>我选择的主题是 <a href="https://github.com/shenliyang/hexo-theme-snippet.git" target="_blank" rel="noopener">hexo-theme-snippet</a> 。配置评论区很省心。</p><p>配置怎么写：<a href="https://github.com/shenliyang/hexo-theme-snippet/blob/master/README.md" target="_blank" rel="noopener">hexo-theme-snippet README</a></p><p>我是本地跑一下然后看到想改哪里就去配置文件里面找。大多数都是文字填空啦。</p><h2 id="文章分类与标签"><a href="#文章分类与标签" class="headerlink" title="文章分类与标签"></a>文章分类与标签</h2><p>也就是 categories 与 tags。<a href="https://linlif.github.io/2017/05/27/Hexo使用攻略-添加分类及标签/" target="_blank" rel="noopener">一个教程</a> 。</p><p>我在操作的时候有一个误解，<code>site\source\categories\index.md</code> 文档不需要自己手动写有哪些分类，这个文件直接抄模板就好了。最后网站有哪些分类是 hexo 根据所有文章里面的 categories 自动统计生成的。标签同理。</p><p>一篇文章只能由一个分类，可以有多个标签。多个分类，则会被依次视为父分类和子分类。</p><h2 id="支持RSS"><a href="#支持RSS" class="headerlink" title="支持RSS"></a>支持RSS</h2><p>参考教程 <a href="https://wxnacy.com/2018/12/12/hexo-add-rss/" target="_blank" rel="noopener">hexo rss</a> ，无坑点。</p><p>安装插件 hexo-generator-feed</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm add hexo-generator-feed</span><br></pre></td></tr></table></figure><p>在 hexo 根目录下的 <code>_config.yml</code> 文件中添加配置</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">feed:</span><br><span class="line">    type: atom</span><br><span class="line">    path: atom.xml</span><br><span class="line">    limit: 20</span><br></pre></td></tr></table></figure><p>在 theme 目录下的 <code>_config.yml</code> 文件中添加配置</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">rss: &#x2F;atom.xml</span><br></pre></td></tr></table></figure><p>重新生成博客</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo clean &amp;&amp; hexo g</span><br></pre></td></tr></table></figure><p>在 <code>public</code> 文件夹中就会生成 <code>atom.xml</code> 文件，部署后直接在根目录中访问该文件即可</p><h2 id="开通评论区"><a href="#开通评论区" class="headerlink" title="开通评论区"></a>开通评论区</h2><p>方案来自 <a href="https://valine.js.org/" target="_blank" rel="noopener">valine</a> 。我使用的主题是 hexo-theme-snippet，它在配置文件里提供了对这个方案的支持，可以很方便地开启评论区。没发现坑，就不抄一遍了。</p><p>注意，hexo-theme-snippet 默认就开启了这个评论区，但是因为没有修改 appID 和 appKey，并不能用。（也不应该用，那是别人注册的服务）</p><h2 id="文章插入图片"><a href="#文章插入图片" class="headerlink" title="文章插入图片"></a>文章插入图片</h2><p>有多种做法。</p><ul><li>按照图片存储位置分有：图床；hexo 的 images 文件夹；md 文件同名文件夹；Base64 编码嵌入图片。</li><li>按照插入方法有 <code>![]()</code>；hexo 官方推荐“标签插件语法”；插入 html 标签；HTML标签+Base64 格式插入小图片。</li></ul><p>“标签插件语法”是官方推荐写法，看起来并不优雅。</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123;% asset_img image.jpg This is an image %&#125;</span><br></pre></td></tr></table></figure><p>下面是用插件解决。这种方法的图片放在 md 文件同名文件夹，md 中插入图片使用 <code>![]()</code> 语法。插件自动管理生成网站时的图片路径问题，最后可正常在 md 编辑器、博客网页文章内和博客网页首页上显示图片。</p><p>首先打开博客根目录 <code>_config.yml</code> 配置选项 post_asset_folder: 这个选项设置为 true。效果是：以后使用新建文章命令，<code>hexo n &quot;filename&quot;</code>，会在目录下同时创建 <code>filename.md</code> 文件和 <code>filename</code> 文件夹。</p><p>然后安装插件hexo-asset-image。（参考 <a href="https://cosysn.github.io/2017/07/17/hexo-chinese-unintelligible-text/" target="_blank" rel="noopener">Hexo自动生成的RSS中出现中文乱码</a> ，以下省略掉 0.0.2 版本的中文乱码坑）</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install git+ssh:&#x2F;&#x2F;git@github.com:CodeFalling&#x2F;hexo-asset-image.git</span><br></pre></td></tr></table></figure><p>准备工作做好了。将图片复制到文件夹 <code>filename</code> 中，写 <code>filename.md</code> 文件可以写成如下格式。现在可以正常在md编辑器、博客网页文章内和博客网页首页上显示图片了。</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">![图1](filename&#x2F;pic.jpg)</span><br></pre></td></tr></table></figure><h1 id="效果测试"><a href="#效果测试" class="headerlink" title="效果测试"></a>效果测试</h1><p>插入图片</p><p><img src="/2020/03/10/%E5%8D%9A%E5%AE%A2%E8%B7%B3%E5%9D%91%E4%BA%8C%E4%B8%89%E4%BA%8B/img-01.png" alt="图1"></p><p>图2</p><p><img src="/2020/03/10/%E5%8D%9A%E5%AE%A2%E8%B7%B3%E5%9D%91%E4%BA%8C%E4%B8%89%E4%BA%8B/img-02.png" alt="图2"></p><p>测试一下代码高亮：Python</p><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">jump_step</span><span class="params">(n)</span>:</span></span><br><span class="line">    result = <span class="keyword">lambda</span> n: n <span class="keyword">if</span> n &lt; <span class="number">2</span> <span class="keyword">else</span> <span class="number">2</span> * jump_step(n - <span class="number">1</span>)</span><br><span class="line">    <span class="keyword">return</span> result(n)</span><br></pre></td></tr></table></figure><p>C语言</p><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">int</span> i, n, t1 = <span class="number">0</span>, t2 = <span class="number">1</span>, nextTerm;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"输出几项: "</span>);</span><br><span class="line">    <span class="built_in">scanf</span>(<span class="string">"%d"</span>, &amp;n);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"斐波那契数列: "</span>);</span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">1</span>; i &lt;= n; ++i)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"%d, "</span>, t1);</span><br><span class="line">        nextTerm = t1 + t2;</span><br><span class="line">        t1 = t2;</span><br><span class="line">        t2 = nextTerm;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><h1 id="日常命令"><a href="#日常命令" class="headerlink" title="日常命令"></a>日常命令</h1><p>日常</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">hexo new post &quot;asm&quot;</span><br><span class="line">hexo clean &amp;&amp; hexo g</span><br><span class="line">hexo s -p 4000</span><br><span class="line">hexo d</span><br></pre></td></tr></table></figure><p>卸载某个插件</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm uninstall hexo-asset-image --save</span><br></pre></td></tr></table></figure><h1 id="Todo"><a href="#Todo" class="headerlink" title="Todo"></a>Todo</h1><p>如果我加入了这些功能大概会更新在这篇文章里。咕咕咕。</p><ul><li>数学公式渲染</li><li>gulp 压缩空行与图片</li><li>持续集成</li><li>Gitlab 可以试试</li></ul>]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;已经有很多详细步骤的文章了，所以只记录我安装的插件和一些坑点。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="others" scheme="http://yoursite.com/categories/others/"/>
+    
+    
+      <category term="blog" scheme="http://yoursite.com/tags/blog/"/>
+    
+      <category term="hexo" scheme="http://yoursite.com/tags/hexo/"/>
+    
+      <category term="github pages" scheme="http://yoursite.com/tags/github-pages/"/>
+    
+  </entry>
+  
+  <entry>
     <title>IDA快捷键</title>
     <link href="http://yoursite.com/2020/02/26/IDA%E5%BF%AB%E6%8D%B7%E9%94%AE/"/>
     <id>http://yoursite.com/2020/02/26/IDA%E5%BF%AB%E6%8D%B7%E9%94%AE/</id>
-    <published>2020-02-26T04:13:22.000Z</published>
-    <updated>2020-03-09T11:14:55.674Z</updated>
+    <published>2020-02-25T16:00:00.000Z</published>
+    <updated>2020-03-10T06:21:18.171Z</updated>
     
     <content type="html"><![CDATA[<p>先占坑</p>]]></content>
     
@@ -49,8 +76,8 @@
     <title>攻防世界re新手入门</title>
     <link href="http://yoursite.com/2020/02/26/%E6%94%BB%E9%98%B2%E4%B8%96%E7%95%8Cre%E6%96%B0%E6%89%8B%E5%85%A5%E9%97%A8/"/>
     <id>http://yoursite.com/2020/02/26/%E6%94%BB%E9%98%B2%E4%B8%96%E7%95%8Cre%E6%96%B0%E6%89%8B%E5%85%A5%E9%97%A8/</id>
-    <published>2020-02-26T04:12:57.000Z</published>
-    <updated>2020-03-09T11:08:35.167Z</updated>
+    <published>2020-02-25T16:00:00.000Z</published>
+    <updated>2020-03-10T06:21:53.852Z</updated>
     
     <content type="html"><![CDATA[<p>先占坑</p>]]></content>
     
@@ -70,7 +97,7 @@
     
       <category term="re" scheme="http://yoursite.com/tags/re/"/>
     
-      <category term="adworld" scheme="http://yoursite.com/tags/adworld/"/>
+      <category term="攻防世界" scheme="http://yoursite.com/tags/%E6%94%BB%E9%98%B2%E4%B8%96%E7%95%8C/"/>
     
   </entry>
   
