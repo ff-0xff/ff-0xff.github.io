@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-03-11T07:02:53.134Z</updated>
+  <updated>2020-04-14T07:16:46.048Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -15,6 +15,29 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>GOT表</title>
+    <link href="http://yoursite.com/2020/04/14/GOT%E8%A1%A8/"/>
+    <id>http://yoursite.com/2020/04/14/GOT%E8%A1%A8/</id>
+    <published>2020-04-13T16:00:00.000Z</published>
+    <updated>2020-04-14T07:16:46.048Z</updated>
+    
+    <content type="html"><![CDATA[<p>本文讨论 GOT 表相关概念。主要是整理学习笔记。</p><a id="more"></a><h1 id="GOT-表（Global-Offset-Table）"><a href="#GOT-表（Global-Offset-Table）" class="headerlink" title="GOT 表（Global Offset Table）"></a>GOT 表（Global Offset Table）</h1><p>动态链接是指在运行时完成链接。链接到库有利于复用代码，而动态链接还节约程序所占磁盘和内存空间。在Linux系统中，动态链接库名字以 <code>.so</code> 结束。（静态链接库名字结尾为 <code>.a</code>）</p><p>链接需要确定相关被调用函数的具体地址。动态链接如何在运行时实现这个功能呢？GOT 和 PLT 表（Procedure Linkage Table，过程链接表）被用来解决这一问题。</p><p>在 ELF 文件中相关段的名称与解释如下。</p><table><thead><tr><th>段 Section</th><th>解释</th></tr></thead><tbody><tr><td>.got</td><td>外部变量的 got 表，例如 stdin / stdout /stderr，非延迟绑定</td></tr><tr><td>.got.plt</td><td>外部库函数的 got 表，一个表项对应一个函数，例如 printf，延迟绑定</td></tr><tr><td>.plt</td><td>每个外部库函数对应一段 plt 中的代码</td></tr></tbody></table><p>本文的 GOT 表是指 <code>.got.plt</code> 段。</p><p>GOT 表项为一系列函数（或仅仅是小段汇编代码）首地址，PLT 表内容其实是小段汇编。正如下图所示，GOT 表通常是可读可写的。</p><p><img src="/2020/04/14/GOT%E8%A1%A8/1.png" alt="1"></p><p>所有外部库函数调用都会查询 GOT 表来确定跳转的目标地址。GOT 表初始值为各个函数对应的 PLT 表项。第一次调用时，进入 PLT 查询 GOT 表确定跳转目的地址，将跳转到 PLT +6，然后调用 <code>_dl_runtime_resolve()</code>，它将找到被调用函数的地址，修改 GOT 表项为被调用函数的地址，并调用被调用函数。第二次以及以后的调用，进入 PLT 查询 GOT 表确定跳转目的地址，将跳转到被调用函数真实地址。</p><p><img src="/2020/04/14/GOT%E8%A1%A8/2.png" alt="2"></p><p>（puts@plt+6 为什么是 +6？你可以参看分析 hello world 中的汇编，地址 0x80482e0 处的 jmp 指令长度为6）</p><p>下文调试 Hello World 部分将进一步展示相关代码与结构。</p><hr><p>以上阐述的其实是加上了延迟绑定的动态链接。引入延迟绑定技术是因为很多函数可能在程序执行完时都不会被用到，若无延迟绑定，启动程序时做了无用功。举个例子，一个程序动态链接了一千个外部库函数，但是每次运行有条件分支，实际只调用十个外部库函数，这造成了大量性能损失，尤其是在程序反复运行的情况下。由于外部变量通常数量少，不会造成性能瓶颈，外部变量不使用延迟绑定。</p><p>延迟绑定可以在编译时关闭。（参考后文防御措施）</p><p>说句废话，由于少了查表跳转等等，静态链接比动态链接快，约 1% 到 5% 。</p><h1 id="分析-Hello-World"><a href="#分析-Hello-World" class="headerlink" title="分析 Hello World"></a>分析 Hello World</h1><h2 id="准备"><a href="#准备" class="headerlink" title="准备"></a>准备</h2><p>C 语言编写 Hello World 如下。</p><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span><span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">"Hello world!"</span>);</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">"Hello world again!"</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>gcc 编译</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">gcc hello.c -o hello -m32 -no-pie</span><br><span class="line"># -m32 表示生成32位程序</span><br><span class="line"># -no-pie 表示强制关闭地址随机化，似乎以前默认关闭，现在默认开启，为了便于分析我们关闭</span><br></pre></td></tr></table></figure><h2 id="gdb-调试"><a href="#gdb-调试" class="headerlink" title="gdb 调试"></a>gdb 调试</h2><p>我们使用 gdb 调试观察延迟绑定。</p><p>使用 gdb 查看 main 函数</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">disassemble main</span><br><span class="line">Dump of assembler code for function main:</span><br><span class="line">   0x08048426 &lt;+0&gt;:lea    ecx,[esp+0x4]</span><br><span class="line">   0x0804842a &lt;+4&gt;:and    esp,0xfffffff0</span><br><span class="line">   0x0804842d &lt;+7&gt;:push   DWORD PTR [ecx-0x4]</span><br><span class="line">   0x08048430 &lt;+10&gt;:push   ebp</span><br><span class="line">   0x08048431 &lt;+11&gt;:mov    ebp,esp</span><br><span class="line">   0x08048433 &lt;+13&gt;:push   ebx</span><br><span class="line">   0x08048434 &lt;+14&gt;:push   ecx</span><br><span class="line">   0x08048435 &lt;+15&gt;:call   0x8048360 &lt;__x86.get_pc_thunk.bx&gt;</span><br><span class="line">   0x0804843a &lt;+20&gt;:add    ebx,0x1bc6</span><br><span class="line">   0x08048440 &lt;+26&gt;:sub    esp,0xc</span><br><span class="line">   0x08048443 &lt;+29&gt;:lea    eax,[ebx-0x1b00]</span><br><span class="line">   0x08048449 &lt;+35&gt;:push   eax</span><br><span class="line">   0x0804844a &lt;+36&gt;:call   0x80482e0 &lt;puts@plt&gt;</span><br><span class="line">   0x0804844f &lt;+41&gt;:add    esp,0x10</span><br><span class="line">   0x08048452 &lt;+44&gt;:sub    esp,0xc</span><br><span class="line">   0x08048455 &lt;+47&gt;:lea    eax,[ebx-0x1af3]</span><br><span class="line">   0x0804845b &lt;+53&gt;:push   eax</span><br><span class="line">   0x0804845c &lt;+54&gt;:call   0x80482e0 &lt;puts@plt&gt;</span><br><span class="line">   0x08048461 &lt;+59&gt;:add    esp,0x10</span><br><span class="line">   0x08048464 &lt;+62&gt;:mov    eax,0x0</span><br><span class="line">   0x08048469 &lt;+67&gt;:lea    esp,[ebp-0x8]</span><br><span class="line">   0x0804846c &lt;+70&gt;:pop    ecx</span><br><span class="line">   0x0804846d &lt;+71&gt;:pop    ebx</span><br><span class="line">   0x0804846e &lt;+72&gt;:pop    ebp</span><br><span class="line">   0x0804846f &lt;+73&gt;:lea    esp,[ecx-0x4]</span><br><span class="line">   0x08048472 &lt;+76&gt;:ret    </span><br><span class="line">End of assembler dump.</span><br></pre></td></tr></table></figure><p>在 PLT 表的小段汇编处设置断点。</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">b *0x80482e0</span><br></pre></td></tr></table></figure><p>在 gdb 中运行程序，将在断点处暂停，可以看到 PLT 表中代码如下。（这是 gdb-peda 插件）</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">   0x80482d6:jmp    DWORD PTR ds:0x804a008</span><br><span class="line">   0x80482dc:add    BYTE PTR [eax],al</span><br><span class="line">   0x80482de:add    BYTE PTR [eax],al</span><br><span class="line">&#x3D;&gt; 0x80482e0 &lt;puts@plt&gt;:jmp    DWORD PTR ds:0x804a00c</span><br><span class="line"> | 0x80482e6 &lt;puts@plt+6&gt;:push   0x0</span><br><span class="line"> | 0x80482eb &lt;puts@plt+11&gt;:jmp    0x80482d0</span><br><span class="line"> | 0x80482f0 &lt;__libc_start_main@plt&gt;:jmp    DWORD PTR ds:0x804a010</span><br><span class="line"> | 0x80482f6 &lt;__libc_start_main@plt+6&gt;:push   0x8</span><br><span class="line"> |-&gt;   0x80482e6 &lt;puts@plt+6&gt;:push   0x0</span><br><span class="line">       0x80482eb &lt;puts@plt+11&gt;:jmp    0x80482d0</span><br></pre></td></tr></table></figure><p>地址 0x80482e0 处的汇编是查 GOT 表，由于此处是第一次调用，于是 GOT 表（地址 0x804a00c）中内容为 0x80482e6 ，指向 PLT 表中准备调用 <code>_dl_runtime_resolve()</code> 的代码。</p><p>（奇怪的知识）函数尾调用（原本是 call）可以被编译优化为 jmp 指令，所以可以从这个视角来认识一下这些 PLT 表中的小段汇编代码，push 之后就 jmp 跳走，其实就是函数参数入栈、调用函数。</p><p>继续运行到第二次触发断点。可以发现 jmp 目的地址已经变为 0xf7e46360，即 libc 中的 puts 地址。</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">   0x80482d6:jmp    DWORD PTR ds:0x804a008</span><br><span class="line">   0x80482dc:add    BYTE PTR [eax],al</span><br><span class="line">   0x80482de:add    BYTE PTR [eax],al</span><br><span class="line">&#x3D;&gt; 0x80482e0 &lt;puts@plt&gt;:jmp    DWORD PTR ds:0x804a00c</span><br><span class="line"> | 0x80482e6 &lt;puts@plt+6&gt;:push   0x0</span><br><span class="line"> | 0x80482eb &lt;puts@plt+11&gt;:jmp    0x80482d0</span><br><span class="line"> | 0x80482f0 &lt;__libc_start_main@plt&gt;:jmp    DWORD PTR ds:0x804a010</span><br><span class="line"> | 0x80482f6 &lt;__libc_start_main@plt+6&gt;:push   0x8</span><br><span class="line"> |-&gt;   0xf7e46360 &lt;puts&gt;:push   ebp</span><br><span class="line">       0xf7e46361 &lt;puts+1&gt;:mov    ebp,esp</span><br><span class="line">       0xf7e46363 &lt;puts+3&gt;:push   edi</span><br><span class="line">       0xf7e46364 &lt;puts+4&gt;:push   esi</span><br></pre></td></tr></table></figure><h2 id="获取-GOT-表项地址"><a href="#获取-GOT-表项地址" class="headerlink" title="获取 GOT 表项地址"></a>获取 GOT 表项地址</h2><p>可使用 objdump 获取 GOT 表项地址信息</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">objdump -R hello</span><br><span class="line"></span><br><span class="line">hello：     文件格式 elf32-i386</span><br><span class="line"></span><br><span class="line">DYNAMIC RELOCATION RECORDS</span><br><span class="line">OFFSET   TYPE              VALUE </span><br><span class="line">08049ffc R_386_GLOB_DAT    __gmon_start__</span><br><span class="line">0804a00c R_386_JUMP_SLOT   puts@GLIBC_2.0</span><br><span class="line">0804a010 R_386_JUMP_SLOT   __libc_start_main@GLIBC_2.0</span><br></pre></td></tr></table></figure><h1 id="如何防御-GOT-表劫持"><a href="#如何防御-GOT-表劫持" class="headerlink" title="如何防御 GOT 表劫持"></a>如何防御 GOT 表劫持</h1><p>GOT 表劫持需要：</p><ul><li>GOT 表内存属性可写</li><li>存在内存写漏洞</li></ul><p>最终可以劫持程序流程。</p><p>重定位只读（Relocation Read Only）缓解措施</p><ul><li>编译选项：gcc -z,relro</li><li>在进入 main() 之前，所有的外部函数都会被解析</li><li>所有 GOT 表设置为只读</li><li>绕过方法<ul><li>劫持为开启该保护的动态库中的 GOT 表（例如 libc 中的 GOT 表）</li><li>改写函数返回地址或函数指针</li></ul></li></ul><p>上面的<strong>编译选项</strong>有问题，应该是这个：<a href="https://firmianay.gitbooks.io/ctf-all-in-one/doc/4.4_gcc_sec.html#%E7%BC%96%E8%AF%91%E5%8F%82%E6%95%B0" target="_blank" rel="noopener">CTF All in One: RELRO 编译参数</a>。你可以用上文的代码再次实验，了解这个编译选项的效果。</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcc -z now</span><br></pre></td></tr></table></figure><p><img src="/2020/04/14/GOT%E8%A1%A8/3.png" alt="3"></p><h1 id="我的闲扯"><a href="#我的闲扯" class="headerlink" title="我的闲扯"></a>我的闲扯</h1><h2 id="动态链接器自举"><a href="#动态链接器自举" class="headerlink" title="动态链接器自举"></a>动态链接器自举</h2><p>算是本文的延伸内容吧。</p><p><strong>动态链接器</strong>负责动态库的装入与链接。</p><p>对于使用了动态链接库的程序，在系统开始运行程序之前，首先会把控制权交给<strong>动态链接器</strong>，由它完成所有的动态链接工作以后再把控制权交给程序，然后开始执行。动态链接器本身也是一个共享对象，其他共享对象可以依赖动态链接器完成链接和装载。我们不能允许“鸡生蛋、蛋生鸡”无限循环，那么动态链接器如何自举？</p><p><a href="https://www.cnblogs.com/linhaostudy/p/10544917.html" target="_blank" rel="noopener">一篇博客</a> 如下。</p><p>动态链接器入口地址即是自举代码的入口，当操作系统将进程控制权交给动态链接器时，动态链接器的自举代码即开始运行。自举代码首先会找到它自己的 GOT。而 GOT 的第一个入口保存的是 “.dynamic” 段的偏移地址，由此找到了动态连机器本身的 “.dynamic” 段。通过 “.dynamic” 的信息，自举代码便可以获得动态链接器本身的重定位表和符号表等，从而得到动态链接器本身的重定位入口，先将它们全部重定位。从这一步开始，动态链接器代码中才可以使用自己的全局变量和静态变量。</p><p>实际上在动态链接器的自举代码中，除了不可以使用全局变量和静态变量之外，甚至不能调用函数，即动态链接器本身的函数也不能调用。这是为什么呢？其实我们在前面分析地址无关代码时已经提到过，实际上使用 PIC 模式编译的共享对象，对于模块内部的函数调用也是采用跟模块外部函数调用一样的方式，即使用 GOT/PLT 的方式，所以在 GOT/PLT 没有被重定位之前，自举代码不可以使用任何全局变量，也不可以调用函数。</p><p>更多内容请参考《程序员的自我修养——链接，装载与库》以及相关读书笔记博客吧。</p><h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><ul><li>选题与多数内容选自长亭杨坤 2020-4-13 公开课。听课一时爽，没有保存到一些原始的材料，我写的可能有出入。</li><li>《程序员的自我修养——链接，装载与库》</li></ul><h1 id="TODO"><a href="#TODO" class="headerlink" title="TODO"></a>TODO</h1><ul><li>找 pwn 题补充</li></ul>]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;本文讨论 GOT 表相关概念。主要是整理学习笔记。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="学习" scheme="http://yoursite.com/categories/%E5%AD%A6%E4%B9%A0/"/>
+    
+    
+      <category term="pwn" scheme="http://yoursite.com/tags/pwn/"/>
+    
+  </entry>
   
   <entry>
     <title>博客加密的正确打开方式</title>
@@ -74,35 +97,6 @@
   </entry>
   
   <entry>
-    <title>IDA快捷键</title>
-    <link href="http://yoursite.com/2020/02/26/IDA%E5%BF%AB%E6%8D%B7%E9%94%AE/"/>
-    <id>http://yoursite.com/2020/02/26/IDA%E5%BF%AB%E6%8D%B7%E9%94%AE/</id>
-    <published>2020-02-25T16:00:00.000Z</published>
-    <updated>2020-03-10T06:21:18.171Z</updated>
-    
-    <content type="html"><![CDATA[<p>先占坑</p>]]></content>
-    
-    <summary type="html">
-    
-      
-      
-        &lt;p&gt;先占坑&lt;/p&gt;
-
-      
-    
-    </summary>
-    
-    
-      <category term="学习" scheme="http://yoursite.com/categories/%E5%AD%A6%E4%B9%A0/"/>
-    
-    
-      <category term="re" scheme="http://yoursite.com/tags/re/"/>
-    
-      <category term="pwn" scheme="http://yoursite.com/tags/pwn/"/>
-    
-  </entry>
-  
-  <entry>
     <title>攻防世界re新手入门</title>
     <link href="http://yoursite.com/2020/02/26/%E6%94%BB%E9%98%B2%E4%B8%96%E7%95%8Cre%E6%96%B0%E6%89%8B%E5%85%A5%E9%97%A8/"/>
     <id>http://yoursite.com/2020/02/26/%E6%94%BB%E9%98%B2%E4%B8%96%E7%95%8Cre%E6%96%B0%E6%89%8B%E5%85%A5%E9%97%A8/</id>
@@ -128,6 +122,35 @@
       <category term="re" scheme="http://yoursite.com/tags/re/"/>
     
       <category term="攻防世界" scheme="http://yoursite.com/tags/%E6%94%BB%E9%98%B2%E4%B8%96%E7%95%8C/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>IDA快捷键</title>
+    <link href="http://yoursite.com/2020/02/26/IDA%E5%BF%AB%E6%8D%B7%E9%94%AE/"/>
+    <id>http://yoursite.com/2020/02/26/IDA%E5%BF%AB%E6%8D%B7%E9%94%AE/</id>
+    <published>2020-02-25T16:00:00.000Z</published>
+    <updated>2020-03-10T06:21:18.171Z</updated>
+    
+    <content type="html"><![CDATA[<p>先占坑</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;先占坑&lt;/p&gt;
+
+      
+    
+    </summary>
+    
+    
+      <category term="学习" scheme="http://yoursite.com/categories/%E5%AD%A6%E4%B9%A0/"/>
+    
+    
+      <category term="pwn" scheme="http://yoursite.com/tags/pwn/"/>
+    
+      <category term="re" scheme="http://yoursite.com/tags/re/"/>
     
   </entry>
   
